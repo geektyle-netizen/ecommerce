@@ -1,0 +1,128 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isAdmin() {
+      return request.auth != null && (
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
+        request.auth.token.email == 'irshadvayad01@gmail.com'
+      );
+    }
+    
+    function isOwner(uid) {
+      return request.auth != null && request.auth.uid == uid;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidId(id) { return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+
+    // Users
+    function isValidUser(data) {
+      return data.keys().hasAll(['email', 'createdAt', 'role']) && 
+             data.keys().size() == 3 &&
+             data.email is string && data.email.size() <= 256 &&
+             data.createdAt is timestamp &&
+             data.role in ['customer', 'admin'];
+    }
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && (incoming().role == 'customer' || (incoming().role == 'admin' && request.auth.token.email == 'irshadvayad01@gmail.com')) && incoming().email == request.auth.token.email && incoming().createdAt == request.time;
+      allow update: if (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly([])) || (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role']));
+      allow delete: if isAdmin();
+    }
+
+    // Products
+    function isValidProduct(data) {
+       return data.keys().hasAll(['title', 'description', 'price', 'category', 'images', 'inventory', 'createdAt', 'updatedAt']) &&
+              data.title is string && data.title.size() <= 200 &&
+              data.description is string && data.description.size() <= 10000 &&
+              data.price is number && data.price >= 0 &&
+              data.category is string && data.category.size() <= 100 &&
+              data.images is list && data.images.size() <= 10 &&
+              (data.images.size() == 0 || data.images[0] is string) &&
+              data.inventory is number && data.inventory >= 0 &&
+              data.createdAt is timestamp && data.updatedAt is timestamp &&
+              (!data.keys().hasAny(['rating']) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
+              (!data.keys().hasAny(['reviewCount']) || data.reviewCount is number);
+    }
+    
+    match /products/{productId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
+      allow update: if (isAdmin() && isValidId(productId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'price', 'category', 'images', 'inventory', 'rating', 'reviewCount', 'updatedAt']) && incoming().updatedAt == request.time) || 
+                    (isSignedIn() && isValidId(productId) && incoming().diff(existing()).affectedKeys().hasOnly(['inventory', 'rating', 'reviewCount', 'updatedAt']) && incoming().updatedAt == request.time);
+      allow delete: if isAdmin() && isValidId(productId);
+      
+      // Reviews
+      function isValidReview(data) {
+        return data.keys().hasAll(['userId', 'userName', 'rating', 'createdAt']) &&
+               data.userId is string && data.userId == request.auth.uid &&
+               data.userName is string && data.userName.size() <= 256 &&
+               data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+               data.createdAt is timestamp &&
+               (!data.keys().hasAny(['text']) || (data.text is string && data.text.size() <= 2000)) &&
+               (!data.keys().hasAny(['images']) || (data.images is list && data.images.size() <= 5 && (data.images.size() == 0 || data.images[0] is string)));
+      }
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isSignedIn() && isValidId(reviewId) && isValidReview(incoming()) && incoming().createdAt == request.time &&
+                      existsAfter(/databases/$(database)/documents/products/$(productId)); 
+                      // Ensures product is updated when review is created
+        allow delete: if isAdmin();
+      }
+    }
+
+    // Orders
+    function isValidOrder(data) {
+       return data.keys().hasAll(['userId', 'items', 'totalAmount', 'status', 'createdAt', 'updatedAt']) &&
+              data.userId is string && data.userId == request.auth.uid &&
+              data.items is list && data.items.size() > 0 && data.items.size() <= 50 && data.items[0] is map &&
+              data.totalAmount is number && data.totalAmount >= 0 &&
+              data.status in ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] &&
+              data.createdAt is timestamp && data.updatedAt is timestamp &&
+              (!data.keys().hasAny(['paymentId']) || data.paymentId is string);
+    }
+
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && isValidId(orderId) && isValidOrder(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time && incoming().status == 'pending';
+      allow update: if (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentId', 'updatedAt']) && incoming().updatedAt == request.time) ||
+                    (isSignedIn() && existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentId', 'updatedAt']) && incoming().updatedAt == request.time);
+    }
+
+    // Wishlists
+    function isValidWishlist(data) {
+       return data.keys().hasAll(['productIds', 'updatedAt']) &&
+              data.keys().size() == 2 &&
+              data.productIds is list && data.productIds.size() <= 100 && (data.productIds.size() == 0 || data.productIds[0] is string) &&
+              data.updatedAt is timestamp;
+    }
+
+    match /wishlists/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidId(userId) && isValidWishlist(incoming()) && incoming().updatedAt == request.time;
+      allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['productIds', 'updatedAt']) && incoming().updatedAt == request.time;
+      allow delete: if isOwner(userId);
+    }
+
+    // Admin Settings
+    match /settings/admin {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+  }
+}
