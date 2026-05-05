@@ -1,5 +1,5 @@
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, Users, FileText, Settings as SettingsIcon, ArrowLeft, LogOut } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Users, FileText, Settings as SettingsIcon, ArrowLeft, LogOut, Layers, Tags } from 'lucide-react';
 import { AppUser } from '../App';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
@@ -15,6 +15,8 @@ export default function AdminLayout({ user }: { user: AppUser | null }) {
 
   const navItems = [
     { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+    { name: 'Categories', path: '/admin/categories', icon: Layers },
+    { name: 'Subcategories', path: '/admin/subcategories', icon: Tags },
     { name: 'Products', path: '/admin/products', icon: Package },
     { name: 'Orders', path: '/admin/orders', icon: ShoppingBag },
     { name: 'Users', path: '/admin/users', icon: Users },

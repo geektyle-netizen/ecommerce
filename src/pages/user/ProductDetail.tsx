@@ -4,6 +4,7 @@ import { doc, getDoc, collection, query, orderBy, getDocs, setDoc, serverTimesta
 import { db, handleFirestoreError, OperationType, auth } from '../../firebase';
 import { AppUser } from '../../App';
 import { useCart } from '../../context/CartContext';
+import { useWishlist } from '../../context/WishlistContext';
 import { Star, ShoppingCart, Heart, Image as ImageIcon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
@@ -15,6 +16,7 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
   const [loading, setLoading] = useState(true);
   const [mainImage, setMainImage] = useState<string>('');
   const { addToCart } = useCart();
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   
   // Review form
   const [reviewText, setReviewText] = useState('');
@@ -64,38 +66,17 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
     });
   };
 
-  const handleWishlist = async () => {
+  const handleWishlist = () => {
     if (!user) {
       navigate('/login');
       return;
     }
     if (!id) return;
     
-    try {
-      const wishlistRef = doc(db, 'wishlists', user.uid);
-      const wishlistDoc = await getDoc(wishlistRef);
-      
-      let newProducts = [];
-      if (wishlistDoc.exists()) {
-        const data = wishlistDoc.data();
-        if (data.productIds.includes(id)) {
-           // Remove
-           newProducts = data.productIds.filter((p: string) => p !== id);
-        } else {
-           // Add
-           newProducts = [...data.productIds, id];
-        }
-      } else {
-        newProducts = [id];
-      }
-      
-      await setDoc(wishlistRef, {
-        productIds: newProducts,
-        updatedAt: serverTimestamp()
-      });
-      alert(wishlistDoc.exists() && wishlistDoc.data().productIds.includes(id) ? 'Removed from wishlist' : 'Added to wishlist!');
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `wishlists/${user.uid}`);
+    if (isInWishlist(id)) {
+      removeFromWishlist(id);
+    } else {
+      addToWishlist(id);
     }
   };
 
@@ -205,7 +186,17 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 mb-4 leading-tight">{product.title}</h1>
           
           <div className="flex items-center space-x-4 mb-6">
-            <div className="text-3xl font-light text-gray-900">₹{product.price.toLocaleString()}</div>
+            <div className="flex items-baseline space-x-2">
+              <span className="text-3xl font-light text-gray-900">₹{product.price.toLocaleString()}</span>
+              {product.originalPrice > product.price && (
+                <>
+                  <span className="text-xl font-medium text-gray-400 line-through">₹{product.originalPrice.toLocaleString()}</span>
+                  <span className="text-sm font-bold text-green-600 bg-green-50 px-2.5 py-1 rounded-md">
+                    {Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF
+                  </span>
+                </>
+              )}
+            </div>
             {product.rating > 0 && (
               <div className="flex items-center text-sm font-medium text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">
                 <Star className="w-4 h-4 fill-amber-500 text-amber-500 mr-1.5" />
@@ -230,10 +221,10 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
               </button>
               <button
                 onClick={handleWishlist}
-                className="flex items-center justify-center p-4 rounded-2xl bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-900 transition-colors"
-                title="Save to Wishlist"
+                className={`flex items-center justify-center p-4 rounded-2xl border transition-colors ${isInWishlist(id!) ? 'bg-red-50 border-red-100 text-red-500 hover:bg-red-100' : 'bg-gray-50 hover:bg-gray-100 border-gray-200 text-gray-900'}`}
+                title={isInWishlist(id!) ? "Remove from Wishlist" : "Save to Wishlist"}
               >
-                <Heart className="w-6 h-6" />
+                <Heart className="w-6 h-6" fill={isInWishlist(id!) ? "currentColor" : "none"} />
               </button>
             </div>
             <p className="text-sm text-center text-gray-500">

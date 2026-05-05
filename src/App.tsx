@@ -18,6 +18,8 @@ import Wishlist from './pages/user/Wishlist';
 import AdminLayout from './components/AdminLayout';
 import Dashboard from './pages/admin/Dashboard';
 import ProductsManager from './pages/admin/ProductsManager';
+import CategoriesManager from './pages/admin/CategoriesManager';
+import SubcategoriesManager from './pages/admin/SubcategoriesManager';
 import OrdersManager from './pages/admin/OrdersManager';
 import UsersManager from './pages/admin/UsersManager';
 import Reports from './pages/admin/Reports';
@@ -102,6 +104,8 @@ export default function App() {
       {/* Admin Routes */}
       <Route path="/admin" element={user?.role === 'admin' ? <AdminLayout user={user} /> : <Navigate to="/" />}>
         <Route index element={<Dashboard />} />
+        <Route path="categories" element={<CategoriesManager />} />
+        <Route path="subcategories" element={<SubcategoriesManager />} />
         <Route path="products" element={<ProductsManager />} />
         <Route path="orders" element={<OrdersManager />} />
         <Route path="users" element={<UsersManager />} />

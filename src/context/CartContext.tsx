@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import toast from 'react-hot-toast';
 
 export interface CartItem {
   productId: string;
@@ -39,6 +40,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addToCart = (newItem: CartItem) => {
     setItems((prev) => {
+      toast.success('Added to cart', {
+        icon: '🛒',
+        style: {
+          borderRadius: '10px',
+          background: '#eff6ff',
+          color: '#1e40af',
+        },
+      });
       const existing = prev.find(i => i.productId === newItem.productId);
       if (existing) {
         return prev.map(i => i.productId === newItem.productId ? { ...i, quantity: i.quantity + newItem.quantity } : i);

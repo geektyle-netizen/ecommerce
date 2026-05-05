@@ -19,11 +19,11 @@ export default function OrderTracking({ user }: { user: AppUser }) {
         const querySnapshot = await getDocs(q);
         const fetchedOrders = querySnapshot.docs.map(doc => ({
           id: doc.id,
-          ...doc.data()
-        }));
+          ...(doc.data() as object)
+        })) as any[];
         
         // Manual sort since compound queries might require a composite index that isn't built yet
-        fetchedOrders.sort((a, b) => b.createdAt?.toMillis() - a.createdAt?.toMillis());
+        fetchedOrders.sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
         setOrders(fetchedOrders);
       } catch (error) {
         handleFirestoreError(error, OperationType.LIST, 'orders');

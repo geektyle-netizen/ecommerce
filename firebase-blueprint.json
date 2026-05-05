@@ -1,5 +1,26 @@
 {
   "entities": {
+    "Category": {
+      "title": "Category",
+      "description": "Product category",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "createdAt"]
+    },
+    "SubCategory": {
+      "title": "SubCategory",
+      "description": "Product subcategory",
+      "type": "object",
+      "properties": {
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["categoryId", "name", "createdAt"]
+    },
     "User": {
       "title": "User",
       "description": "A user in the system.",
@@ -18,9 +39,11 @@
       "properties": {
         "title": { "type": "string", "description": "Product title" },
         "description": { "type": "string", "description": "Product details" },
+        "originalPrice": { "type": "number", "description": "Original price of the product" },
         "price": { "type": "number", "description": "Price of the product" },
-        "category": { "type": "string", "description": "Category name" },
-        "images": { "type": "array", "items": { "type": "string" }, "description": "Array of image URLs" },
+        "category": { "type": "string", "description": "Category name or ID" },
+        "subCategory": { "type": "string", "description": "Subcategory name or ID" },
+        "images": { "type": "array", "items": { "type": "string" }, "description": "Array of image URLs or base64" },
         "inventory": { "type": "number", "description": "Number of items in stock" },
         "rating": { "type": "number", "description": "Average rating" },
         "reviewCount": { "type": "number", "description": "Number of reviews" },
@@ -52,7 +75,16 @@
         "items": { "type": "array", "items": { "$ref": "#/entities/OrderItem" }, "description": "Items in the order" },
         "totalAmount": { "type": "number", "description": "Total checkout amount" },
         "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"], "description": "Order status" },
+        "paymentMethod": { "type": "string", "enum": ["razorpay", "cod"] },
         "paymentId": { "type": "string", "description": "Razorpay payment/order ID" },
+        "address": { "type": "object", "properties": {
+            "name": { "type": "string" },
+            "street": { "type": "string" },
+            "city": { "type": "string" },
+            "state": { "type": "string" },
+            "zip": { "type": "string" },
+            "contactNumber": { "type": "string" }
+        } },
         "createdAt": { "type": "string", "description": "Creation timestamp." },
         "updatedAt": { "type": "string", "description": "Last update timestamp." }
       },
@@ -91,6 +123,14 @@
     }
   },
   "firestore": {
+    "categories/{categoryId}": {
+      "schema": { "$ref": "#/entities/Category" },
+      "description": "Product categories"
+    },
+    "subcategories/{subcategoryId}": {
+      "schema": { "$ref": "#/entities/SubCategory" },
+      "description": "Product subcategories"
+    },
     "users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles and roles"
@@ -117,3 +157,4 @@
     }
   }
 }
+  

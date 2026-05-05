@@ -3,14 +3,21 @@ import { ShoppingCart, Heart, User, LogOut } from 'lucide-react';
 import { AppUser } from '../App';
 import { auth } from '../firebase';
 import { signOut } from 'firebase/auth';
+import { useCart } from '../context/CartContext';
+import { useWishlist } from '../context/WishlistContext';
 
 export default function Layout({ user }: { user: AppUser | null }) {
   const navigate = useNavigate();
+  const { items } = useCart();
+  const { productIds } = useWishlist();
 
   const handleLogout = async () => {
     await signOut(auth);
     navigate('/');
   };
+
+  const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
+  const wishlistCount = productIds.length;
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-gray-50 text-gray-900">
@@ -37,10 +44,20 @@ export default function Layout({ user }: { user: AppUser | null }) {
               {user ? (
                 <>
                   <Link to="/wishlist" className="p-2.5 hover:bg-gray-100 rounded-full text-gray-600 hover:text-indigo-600 transition-colors relative" title="Wishlist">
-                    <Heart className="w-5 h-5" />
+                    <Heart className="w-5 h-5" fill={wishlistCount > 0 ? "currentColor" : "none"} />
+                    {wishlistCount > 0 && (
+                      <span className="absolute top-1 right-1 bg-red-500 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                        {wishlistCount}
+                      </span>
+                    )}
                   </Link>
                   <Link to="/cart" className="p-2.5 hover:bg-gray-100 rounded-full text-gray-600 hover:text-indigo-600 transition-colors relative" title="Cart">
                     <ShoppingCart className="w-5 h-5" />
+                    {cartCount > 0 && (
+                      <span className="absolute top-1 right-1 bg-indigo-600 text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+                        {cartCount}
+                      </span>
+                    )}
                   </Link>
                   <div className="relative group">
                     <button className="flex items-center space-x-2 p-2.5 focus:outline-none hover:bg-gray-100 rounded-full text-gray-600 hover:text-indigo-600 transition-colors">

@@ -42,6 +42,35 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Categories
+    function isValidCategory(data) {
+       return data.keys().hasAll(['name', 'createdAt']) &&
+              data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+              data.createdAt is timestamp;
+    }
+
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(categoryId) && isValidCategory(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['name']);
+      allow delete: if isAdmin();
+    }
+
+    // Subcategories
+    function isValidSubCategory(data) {
+       return data.keys().hasAll(['categoryId', 'name', 'createdAt']) &&
+              data.categoryId is string &&
+              data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+              data.createdAt is timestamp;
+    }
+
+    match /subcategories/{subcategoryId} {
+      allow read: if true;
+      allow create: if isAdmin() && isValidId(subcategoryId) && isValidSubCategory(incoming()) && incoming().createdAt == request.time;
+      allow update: if isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['categoryId', 'name']);
+      allow delete: if isAdmin();
+    }
+
     // Products
     function isValidProduct(data) {
        return data.keys().hasAll(['title', 'description', 'price', 'category', 'images', 'inventory', 'createdAt', 'updatedAt']) &&
@@ -53,6 +82,8 @@ service cloud.firestore {
               (data.images.size() == 0 || data.images[0] is string) &&
               data.inventory is number && data.inventory >= 0 &&
               data.createdAt is timestamp && data.updatedAt is timestamp &&
+              (!data.keys().hasAny(['subCategory']) || (data.subCategory is string && data.subCategory.size() <= 100)) &&
+              (!data.keys().hasAny(['originalPrice']) || (data.originalPrice is number && data.originalPrice >= 0)) &&
               (!data.keys().hasAny(['rating']) || (data.rating is number && data.rating >= 0 && data.rating <= 5)) &&
               (!data.keys().hasAny(['reviewCount']) || data.reviewCount is number);
     }
@@ -60,7 +91,7 @@ service cloud.firestore {
     match /products/{productId} {
       allow read: if true;
       allow create: if isAdmin() && isValidId(productId) && isValidProduct(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time;
-      allow update: if (isAdmin() && isValidId(productId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'price', 'category', 'images', 'inventory', 'rating', 'reviewCount', 'updatedAt']) && incoming().updatedAt == request.time) || 
+      allow update: if (isAdmin() && isValidId(productId) && incoming().diff(existing()).affectedKeys().hasOnly(['title', 'description', 'price', 'originalPrice', 'category', 'subCategory', 'images', 'inventory', 'rating', 'reviewCount', 'updatedAt']) && incoming().updatedAt == request.time) || 
                     (isSignedIn() && isValidId(productId) && incoming().diff(existing()).affectedKeys().hasOnly(['inventory', 'rating', 'reviewCount', 'updatedAt']) && incoming().updatedAt == request.time);
       allow delete: if isAdmin() && isValidId(productId);
       
@@ -92,7 +123,9 @@ service cloud.firestore {
               data.totalAmount is number && data.totalAmount >= 0 &&
               data.status in ['pending', 'processing', 'shipped', 'delivered', 'cancelled'] &&
               data.createdAt is timestamp && data.updatedAt is timestamp &&
-              (!data.keys().hasAny(['paymentId']) || data.paymentId is string);
+              (!data.keys().hasAny(['paymentMethod']) || data.paymentMethod in ['razorpay', 'cod']) &&
+              (!data.keys().hasAny(['paymentId']) || data.paymentId is string) &&
+              (!data.keys().hasAny(['address']) || (data.address is map && data.address.keys().hasAll(['name', 'street', 'city', 'state', 'zip', 'contactNumber'])));
     }
 
     match /orders/{orderId} {
