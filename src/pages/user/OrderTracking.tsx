@@ -116,7 +116,7 @@ export default function OrderTracking({ user }: { user: AppUser }) {
                         </div>
                         <div>
                           <Link to={`/product/${item.productId}`} className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
-                            Product ID: {item.productId.slice(0, 8)}...
+                            Product ID: {item.productId ? item.productId.slice(0, 8) : 'Unknown'}...
                           </Link>
                           <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
                         </div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, User, LogOut } from 'lucide-react';
 import { AppUser } from '../App';
@@ -17,6 +17,19 @@ export default function Layout({ user }: { user: AppUser | null }) {
     await signOut(auth);
     navigate('/');
   };
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const container = document.getElementById('profile-menu-container');
+      if (container && !container.contains(event.target as Node)) {
+        setIsProfileOpen(false);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  }, []);
 
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const wishlistCount = productIds.length;
@@ -61,10 +74,12 @@ export default function Layout({ user }: { user: AppUser | null }) {
                       </span>
                     )}
                   </Link>
-                  <div className="relative">
+                  <div className="relative" id="profile-menu-container">
                     <button 
-                      onClick={() => setIsProfileOpen(!isProfileOpen)}
-                      onBlur={() => setTimeout(() => setIsProfileOpen(false), 200)}
+                      onClick={(e) => {
+                         e.stopPropagation();
+                         setIsProfileOpen(!isProfileOpen);
+                      }}
                       className="flex items-center space-x-2 p-2.5 focus:outline-none hover:bg-gray-100 rounded-full text-gray-600 hover:text-indigo-600 transition-colors"
                     >
                       <User className="w-5 h-5" />
@@ -77,10 +92,10 @@ export default function Layout({ user }: { user: AppUser | null }) {
                             <p className="text-sm font-bold text-gray-900 truncate">{user.email}</p>
                           </div>
                           {user.role === 'admin' && (
-                            <Link to="/admin" className="block md:hidden px-4 py-2.5 mb-1 text-sm font-bold text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors">Admin Panel</Link>
+                            <Link to="/admin" onClick={() => setIsProfileOpen(false)} className="block md:hidden px-4 py-2.5 mb-1 text-sm font-bold text-purple-600 hover:text-purple-700 hover:bg-purple-50 rounded-xl transition-colors">Admin Panel</Link>
                           )}
-                          <Link to="/orders" className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors">My Orders</Link>
-                          <Link to="/profile" className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors">Profile</Link>
+                          <Link to="/orders" onClick={() => setIsProfileOpen(false)} className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors">My Orders</Link>
+                          <Link to="/profile" onClick={() => setIsProfileOpen(false)} className="block px-4 py-2.5 text-sm font-medium text-gray-700 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors">Profile</Link>
                           <div className="h-px bg-gray-100 my-2"></div>
                           <button onClick={handleLogout} className="w-full text-left px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50 rounded-xl flex items-center transition-colors">
                             <LogOut className="w-4 h-4 mr-2" /> Logout
