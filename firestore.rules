@@ -40,6 +40,22 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming()) && (incoming().role == 'customer' || (incoming().role == 'admin' && request.auth.token.email == 'irshadvayad01@gmail.com')) && incoming().email == request.auth.token.email && incoming().createdAt == request.time;
       allow update: if (isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly([])) || (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['role']));
       allow delete: if isAdmin();
+
+      function isValidAddress(data) {
+         return data.keys().hasAll(['name', 'phone', 'street', 'city', 'state', 'zip', 'createdAt']) &&
+                data.name is string && data.phone is string && data.street is string &&
+                data.city is string && data.state is string && data.zip is string &&
+                data.createdAt is timestamp &&
+                (!data.keys().hasAny(['isDefault']) || data.isDefault is bool);
+      }
+
+      match /addresses/{addressId} {
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId) && isValidId(addressId) && isValidAddress(incoming());
+        allow update: if isOwner(userId) && incoming().diff(existing()).affectedKeys().hasOnly(['name', 'phone', 'street', 'city', 'state', 'zip', 'isDefault']);
+        allow delete: if isOwner(userId);
+      }
     }
 
     // Categories
@@ -131,7 +147,7 @@ service cloud.firestore {
     match /orders/{orderId} {
       allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && isValidId(orderId) && isValidOrder(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time && incoming().status == 'pending';
+      allow create: if isSignedIn() && isValidId(orderId) && isValidOrder(incoming()) && incoming().createdAt == request.time && incoming().updatedAt == request.time && incoming().status in ['pending', 'processing'];
       allow update: if (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentId', 'updatedAt']) && incoming().updatedAt == request.time) ||
                     (isSignedIn() && existing().userId == request.auth.uid && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentId', 'updatedAt']) && incoming().updatedAt == request.time);
     }

@@ -111,6 +111,22 @@
        },
        "required": ["productIds", "updatedAt"]
     },
+    "Address": {
+      "title": "Address",
+      "description": "A saved address for checkout.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "street": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "zip": { "type": "string" },
+        "isDefault": { "type": "boolean" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "street", "city", "state", "zip", "createdAt"]
+    },
     "AdminSettings": {
       "title": "AdminSettings",
       "description": "Global admin configuration.",
@@ -134,6 +150,10 @@
     "users/{userId}": {
       "schema": { "$ref": "#/entities/User" },
       "description": "User profiles and roles"
+    },
+    "users/{userId}/addresses/{addressId}": {
+      "schema": { "$ref": "#/entities/Address" },
+      "description": "User saved addresses"
     },
     "products/{productId}": {
       "schema": { "$ref": "#/entities/Product" },
