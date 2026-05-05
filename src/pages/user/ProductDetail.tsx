@@ -13,6 +13,8 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
   const navigate = useNavigate();
   const [product, setProduct] = useState<any>(null);
   const [reviews, setReviews] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subCategories, setSubCategories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [mainImage, setMainImage] = useState<string>('');
   const { addToCart } = useCart();
@@ -24,11 +26,15 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
   const [submittingReview, setSubmittingReview] = useState(false);
 
   useEffect(() => {
-    const fetchProductAndReviews = async () => {
+    const fetchProductAndData = async () => {
       if (!id) return;
       try {
-        const docRef = doc(db, 'products', id);
-        const docSnap = await getDoc(docRef);
+        const [docSnap, catSnap, subCatSnap, reviewsSnap] = await Promise.all([
+          getDoc(doc(db, 'products', id)),
+          getDocs(query(collection(db, 'categories'))),
+          getDocs(query(collection(db, 'subcategories'))),
+          getDocs(query(collection(db, `products/${id}/reviews`), orderBy('createdAt', 'desc')))
+        ]);
         
         if (docSnap.exists()) {
           const data = docSnap.data();
@@ -37,11 +43,10 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
             setMainImage(data.images[0]);
           }
 
-          // Fetch reviews
-          const reviewsRef = collection(db, `products/${id}/reviews`);
-          const q = query(reviewsRef, orderBy('createdAt', 'desc'));
-          const reviewSnap = await getDocs(q);
-          setReviews(reviewSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          setCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          setSubCategories(subCatSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+          
+          setReviews(reviewsSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         } else {
           navigate('/');
         }
@@ -52,7 +57,7 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
       }
     };
 
-    fetchProductAndReviews();
+    fetchProductAndData();
   }, [id, navigate]);
 
   const handleAddToCart = () => {
@@ -143,6 +148,9 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
   };
 
 
+  const getCategoryName = (cid: string) => categories.find(c => c.id === cid)?.name || cid;
+  const getSubCategoryName = (sid: string) => subCategories.find(s => s.id === sid)?.name || sid;
+
   if (loading) return <div className="py-20 text-center">Loading product...</div>;
   if (!product) return <div className="py-20 text-center">Product not found</div>;
 
@@ -181,7 +189,9 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
         {/* Details */}
         <div className="flex flex-col h-full">
           <div className="mb-2 flex items-center space-x-2">
-             <span className="text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2.5 py-1 rounded-md">{product.category}</span>
+             <span className="text-xs font-bold uppercase tracking-wider text-gray-500 bg-gray-100 px-2.5 py-1 rounded-md">
+               {getCategoryName(product.category)} {product.subCategory && `• ${getSubCategoryName(product.subCategory)}`}
+             </span>
           </div>
           <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-gray-900 mb-4 leading-tight">{product.title}</h1>
           

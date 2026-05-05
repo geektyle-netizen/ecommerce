@@ -8,37 +8,51 @@ import { motion } from 'motion/react';
 export default function Home() {
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  
   const [categoryFilter, setCategoryFilter] = useState<string>('');
-  const [categories, setCategories] = useState<string[]>([]);
+  const [subCategoryFilter, setSubCategoryFilter] = useState<string>('');
+  
+  const [categories, setCategories] = useState<any[]>([]);
+  const [subCategories, setSubCategories] = useState<any[]>([]);
 
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const q = query(collection(db, 'products'), orderBy('createdAt', 'desc'));
-        const querySnapshot = await getDocs(q);
-        const productsData = querySnapshot.docs.map(doc => ({
+        const [prodSnap, catSnap, subCatSnap] = await Promise.all([
+          getDocs(query(collection(db, 'products'), orderBy('createdAt', 'desc'))),
+          getDocs(query(collection(db, 'categories'), orderBy('name', 'asc'))),
+          getDocs(query(collection(db, 'subcategories'), orderBy('name', 'asc')))
+        ]);
+
+        const productsData = prodSnap.docs.map(doc => ({
           id: doc.id,
           ...(doc.data() as object)
         })) as any[];
         
         setProducts(productsData);
-        
-        // Extract unique categories
-        const uniqueCategories = Array.from(new Set(productsData.map(p => p.category))).filter(Boolean);
-        setCategories(uniqueCategories as string[]);
+        setCategories(catSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+        setSubCategories(subCatSnap.docs.map(d => ({ id: d.id, ...d.data() })));
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, 'products');
+        handleFirestoreError(error, OperationType.LIST, 'products/categories');
       } finally {
         setLoading(false);
       }
     };
     
-    fetchProducts();
+    fetchData();
   }, []);
 
-  const filteredProducts = categoryFilter 
-    ? products.filter(p => p.category === categoryFilter)
-    : products;
+  const availableSubcategories = subCategories.filter(sc => sc.categoryId === categoryFilter);
+
+  const filteredProducts = products.filter(p => {
+    let match = true;
+    if (categoryFilter && p.category !== categoryFilter) match = false;
+    if (subCategoryFilter && p.subCategory !== subCategoryFilter) match = false;
+    return match;
+  });
+
+  const getCategoryName = (id: string) => categories.find(c => c.id === id)?.name || id;
+  const getSubCategoryName = (id: string) => subCategories.find(s => s.id === id)?.name || id;
 
   if (loading) {
     return <div className="py-20 text-center">Loading products...</div>;
@@ -94,14 +108,26 @@ export default function Home() {
             <Filter className="w-4 h-4 text-gray-500" />
             <select 
               value={categoryFilter}
-              onChange={(e) => setCategoryFilter(e.target.value)}
+              onChange={(e) => { setCategoryFilter(e.target.value); setSubCategoryFilter(''); }}
               className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-gray-900 focus:border-gray-900 block w-full p-2.5 outline-none"
             >
               <option value="">All Categories</option>
               {categories.map(c => (
-                <option key={c} value={c}>{c}</option>
+                <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
+            {categoryFilter && availableSubcategories.length > 0 && (
+              <select 
+                value={subCategoryFilter}
+                onChange={(e) => setSubCategoryFilter(e.target.value)}
+                className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-gray-900 focus:border-gray-900 block w-full p-2.5 outline-none"
+              >
+                <option value="">All Subcategories</option>
+                {availableSubcategories.map(sc => (
+                  <option key={sc.id} value={sc.id}>{sc.name}</option>
+                ))}
+              </select>
+            )}
           </div>
         </div>
 
@@ -141,7 +167,7 @@ export default function Home() {
                   <div className="flex-1 flex flex-col px-2">
                     {product.category && (
                       <span className="text-[11px] font-bold text-indigo-500 uppercase tracking-widest mb-2 block">
-                        {product.category}
+                        {getCategoryName(product.category)} {product.subCategory && `• ${getSubCategoryName(product.subCategory)}`}
                       </span>
                     )}
                     <h3 className="font-bold text-gray-900 text-lg leading-snug line-clamp-2 mb-3 group-hover:text-indigo-600 transition-colors shrink-0">
