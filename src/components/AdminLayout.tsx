@@ -1,12 +1,25 @@
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, Users, FileText, Settings as SettingsIcon, ArrowLeft, LogOut, Layers, Tags } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Users, FileText, Settings as SettingsIcon, ArrowLeft, LogOut, Layers, Tags, MessageCircle } from 'lucide-react';
 import { AppUser } from '../App';
-import { auth } from '../firebase';
+import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
+import { collection, query, onSnapshot, where } from 'firebase/firestore';
 
 export default function AdminLayout({ user }: { user: AppUser | null }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const [unreadMessagesCount, setUnreadMessagesCount] = useState(0);
+
+  useEffect(() => {
+    // Get total unread by querying all chats where unreadCountAdmin > 0
+    const q = query(collection(db, 'chats'), where('unreadCountAdmin', '>', 0));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+       const count = snapshot.docs.reduce((acc, doc) => acc + doc.data().unreadCountAdmin, 0);
+       setUnreadMessagesCount(count);
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -22,6 +35,7 @@ export default function AdminLayout({ user }: { user: AppUser | null }) {
     { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Reports', path: '/admin/reports', icon: FileText },
     { name: 'Settings', path: '/admin/settings', icon: SettingsIcon },
+    { name: 'Messages', path: '/admin/messages', icon: MessageCircle, badge: unreadMessagesCount }
   ];
 
   return (
@@ -39,14 +53,21 @@ export default function AdminLayout({ user }: { user: AppUser | null }) {
               <Link
                 key={item.name}
                 to={item.path}
-                className={`flex items-center px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+                className={`flex items-center justify-between px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
                   isActive 
                     ? 'bg-gray-100 text-gray-900' 
                     : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
                 }`}
               >
-                <item.icon className={`w-5 h-5 mr-3 ${isActive ? 'text-gray-900' : 'text-gray-400'}`} />
-                {item.name}
+                <div className="flex items-center">
+                  <item.icon className={`w-5 h-5 mr-3 ${isActive ? 'text-gray-900' : 'text-gray-400'}`} />
+                  {item.name}
+                </div>
+                {(item.badge || 0) > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

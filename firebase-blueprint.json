@@ -111,6 +111,31 @@
        },
        "required": ["productIds", "updatedAt"]
     },
+    "Chat": {
+      "title": "Chat",
+      "description": "User chat thread.",
+      "type": "object",
+      "properties": {
+        "userEmail": { "type": "string" },
+        "lastMessage": { "type": "string" },
+        "unreadCountAdmin": { "type": "number" },
+        "unreadCountUser": { "type": "number" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["userEmail", "lastMessage", "unreadCountAdmin", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Individual chat message.",
+      "type": "object",
+      "properties": {
+        "text": { "type": "string" },
+        "sender": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["text", "sender", "createdAt"]
+    },
     "Address": {
       "title": "Address",
       "description": "A saved address for checkout.",

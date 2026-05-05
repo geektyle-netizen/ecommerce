@@ -13,6 +13,9 @@ import Checkout from './pages/user/Checkout';
 import Profile from './pages/user/Profile';
 import OrderTracking from './pages/user/OrderTracking';
 import Wishlist from './pages/user/Wishlist';
+import About from './pages/user/About';
+import Contact from './pages/user/Contact';
+import Faq from './pages/user/Faq';
 
 // Admin Pages
 import AdminLayout from './components/AdminLayout';
@@ -24,6 +27,7 @@ import OrdersManager from './pages/admin/OrdersManager';
 import UsersManager from './pages/admin/UsersManager';
 import Reports from './pages/admin/Reports';
 import Settings from './pages/admin/Settings';
+import Messages from './pages/admin/Messages';
 
 import Login from './pages/Login';
 
@@ -99,6 +103,9 @@ export default function App() {
         <Route path="/profile" element={user ? <Profile user={user} /> : <Navigate to="/login" />} />
         <Route path="/orders" element={user ? <OrderTracking user={user} /> : <Navigate to="/login" />} />
         <Route path="/wishlist" element={user ? <Wishlist user={user} /> : <Navigate to="/login" />} />
+        <Route path="/about" element={<About />} />
+        <Route path="/contact" element={<Contact />} />
+        <Route path="/faq" element={<Faq />} />
       </Route>
 
       {/* Admin Routes */}
@@ -111,6 +118,7 @@ export default function App() {
         <Route path="users" element={<UsersManager />} />
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
+        <Route path="messages" element={<Messages />} />
       </Route>
     </Routes>
   );

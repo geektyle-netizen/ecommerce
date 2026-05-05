@@ -387,9 +387,9 @@ export default function Checkout({ user }: { user: AppUser }) {
                  <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="mr-3 w-4 h-4 text-indigo-600 focus:ring-indigo-500" />
                  <span className="font-medium text-gray-900 flex-1">Pay with Razorpay</span>
                  <div className="flex items-center space-x-2 text-gray-400">
-                    <Smartphone className="w-5 h-5" title="UPI" />
-                    <CreditCard className="w-5 h-5" title="Cards" />
-                    <Globe className="w-5 h-5" title="NetBanking" />
+                    <span title="UPI"><Smartphone className="w-5 h-5" /></span>
+                    <span title="Cards"><CreditCard className="w-5 h-5" /></span>
+                    <span title="NetBanking"><Globe className="w-5 h-5" /></span>
                  </div>
                </label>
                <label className={`flex items-center p-4 border rounded-2xl cursor-pointer transition-colors ${paymentMethod === 'cod' ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200 hover:bg-gray-50'}`}>

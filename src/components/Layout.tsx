@@ -1,17 +1,82 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Heart, User, LogOut } from 'lucide-react';
+import { ShoppingCart, Heart, User, LogOut, MessageCircle, X, Send, Image as ImageIcon } from 'lucide-react';
 import { AppUser } from '../App';
-import { auth } from '../firebase';
+import { auth, db, handleFirestoreError, OperationType } from '../firebase';
 import { signOut } from 'firebase/auth';
 import { useCart } from '../context/CartContext';
 import { useWishlist } from '../context/WishlistContext';
+import { collection, query, orderBy, onSnapshot, setDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function Layout({ user }: { user: AppUser | null }) {
   const navigate = useNavigate();
   const { items } = useCart();
   const { productIds } = useWishlist();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  
+  // Chat state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [replyText, setReplyText] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (user && isChatOpen) {
+       const qMsgs = query(collection(db, `chats/${user.uid}/messages`), orderBy('createdAt', 'asc'));
+       const unsubscribe = onSnapshot(qMsgs, (snapshot) => {
+         setChatMessages(snapshot.docs.map(d => ({id: d.id, ...d.data()})));
+         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+       });
+       
+       updateDoc(doc(db, 'chats', user.uid), { unreadCountUser: 0 }).catch(() => {});
+       return () => unsubscribe();
+    }
+  }, [user, isChatOpen]);
+
+  useEffect(() => {
+    if (user && !isChatOpen) {
+       const unsubscribe = onSnapshot(doc(db, 'chats', user.uid), (docRef) => {
+          if (docRef.exists()) {
+             setUnreadCount(docRef.data().unreadCountUser || 0);
+          }
+       });
+       return () => unsubscribe();
+    } else if (isChatOpen) {
+       setUnreadCount(0);
+    }
+  }, [user, isChatOpen]);
+
+  const handleSendChat = async (e: React.FormEvent) => {
+     e.preventDefault();
+     if (!replyText.trim() || !user) return;
+     
+     try {
+       const newMsgId = crypto.randomUUID();
+       await setDoc(doc(db, `chats/${user.uid}/messages`, newMsgId), {
+          text: replyText.trim(),
+          sender: 'user',
+          createdAt: serverTimestamp()
+       });
+       await setDoc(doc(db, 'chats', user.uid), {
+          userEmail: user.email,
+          lastMessage: replyText.trim(),
+          updatedAt: serverTimestamp(),
+          unreadCountAdmin: 1 // Simplistic, ideally increment
+       }, { merge: true });
+       setReplyText('');
+     } catch(err) {
+       handleFirestoreError(err, OperationType.CREATE, `chats/${user.uid}/messages`);
+     }
+  };
+
+  const openChat = () => {
+    if (!user) {
+      navigate('/login');
+    } else {
+      setIsChatOpen(true);
+    }
+  };
 
   const handleLogout = async () => {
     await signOut(auth);
@@ -147,6 +212,85 @@ export default function Layout({ user }: { user: AppUser | null }) {
           </div>
         </div>
       </footer>
+      {/* Floating Chat Button */}
+      {!isChatOpen && (
+         <button 
+           onClick={openChat}
+           className="fixed bottom-6 right-6 w-14 h-14 bg-indigo-600 text-white rounded-full flex items-center justify-center shadow-2xl hover:bg-indigo-700 hover:scale-105 transition-all z-50 group"
+         >
+           <MessageCircle className="w-6 h-6" />
+           {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white">
+                 {unreadCount}
+              </span>
+           )}
+           {/* Tooltip */}
+           <div className="absolute pr-3 right-full top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              <div className="bg-indigo-900 text-white text-sm whitespace-nowrap px-3 py-1.5 rounded-xl font-medium shadow-sm">
+                 {user ? 'Chat with us' : 'Login to chat'}
+              </div>
+           </div>
+         </button>
+      )}
+
+      {/* Floating Chat Window */}
+      {isChatOpen && user && (
+         <div className="fixed bottom-6 right-6 w-96 max-w-[calc(100vw-3rem)] h-[500px] max-h-[80vh] bg-white rounded-3xl shadow-2xl border border-gray-100 flex flex-col z-50 overflow-hidden transform origin-bottom-right transition-all">
+            <div className="bg-indigo-600 text-white p-4 flex justify-between items-center shrink-0">
+               <div className="flex items-center space-x-3">
+                 <div className="bg-white/20 w-10 h-10 rounded-full flex items-center justify-center">
+                   <MessageCircle className="w-5 h-5 text-indigo-50" />
+                 </div>
+                 <div>
+                   <h3 className="font-bold text-lg leading-tight">Customer Support</h3>
+                   <p className="text-indigo-100 text-xs">Typically replies instantly</p>
+                 </div>
+               </div>
+               <button onClick={() => setIsChatOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X className="w-5 h-5" />
+               </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+               <div className="text-center">
+                 <span className="text-xs text-gray-400 font-medium bg-gray-100 px-3 py-1 rounded-full cursor-default">Today</span>
+               </div>
+               <div className="flex justify-start">
+                  <div className="max-w-[85%] bg-white border border-gray-100 text-gray-800 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm text-sm">
+                     Hello! 👋 How can we help you today?
+                  </div>
+               </div>
+               {chatMessages.map(msg => (
+                 <div key={msg.id} className={`flex ${msg.sender === 'admin' ? 'justify-start' : 'justify-end'}`}>
+                    <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm shadow-sm ${msg.sender === 'admin' ? 'bg-white border border-gray-100 text-gray-800 rounded-tl-sm' : 'bg-indigo-600 text-white rounded-tr-sm'}`}>
+                       {msg.imageUrl && (
+                         <img src={msg.imageUrl} alt="attached" className="max-w-full rounded-xl mb-2" />
+                       )}
+                       <p className="whitespace-pre-wrap">{msg.text}</p>
+                    </div>
+                 </div>
+               ))}
+               <div ref={messagesEndRef} />
+            </div>
+
+            <div className="p-3 bg-white border-t border-gray-100 shrink-0">
+               <form onSubmit={handleSendChat} className="flex items-center space-x-2 bg-gray-50 p-1.5 rounded-full border border-gray-200 focus-within:border-indigo-400 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
+                 <input
+                   type="text"
+                   value={replyText}
+                   onChange={(e) => setReplyText(e.target.value)}
+                   placeholder="Type a message..."
+                   className="flex-1 bg-transparent border-none px-4 py-2 outline-none text-sm font-medium"
+                 />
+                 {/* Image upload can be added here */}
+                 
+                 <button type="submit" disabled={!replyText.trim()} className="bg-indigo-600 text-white p-2.5 rounded-full hover:bg-indigo-700 disabled:opacity-50 disabled:bg-indigo-400 transition-colors shrink-0">
+                   <Send className="w-4 h-4" />
+                 </button>
+               </form>
+            </div>
+         </div>
+      )}
     </div>
   );
 }

@@ -168,6 +168,35 @@ service cloud.firestore {
       allow delete: if isOwner(userId);
     }
 
+    // Chats
+    function isValidChat(data) {
+       return data.keys().hasAll(['userEmail', 'lastMessage', 'updatedAt', 'unreadCountAdmin']) &&
+              data.userEmail is string && data.lastMessage is string && data.updatedAt is timestamp &&
+              data.unreadCountAdmin is number && (!data.keys().hasAny(['unreadCountUser']) || data.unreadCountUser is number);
+    }
+    
+    match /chats/{chatId} {
+      allow get: if isSignedIn() && (chatId == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isOwner(chatId) && isValidChat(incoming());
+      allow update: if (isOwner(chatId) && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'updatedAt', 'unreadCountAdmin', 'userEmail', 'unreadCountUser'])) ||
+                       (isAdmin() && incoming().diff(existing()).affectedKeys().hasOnly(['lastMessage', 'updatedAt', 'unreadCountUser', 'unreadCountAdmin']));
+      allow delete: if isAdmin();
+      
+      function isValidMessage(data) {
+         return data.keys().hasAll(['text', 'sender', 'createdAt']) &&
+                data.text is string && data.sender in ['user', 'admin'] && data.createdAt is timestamp &&
+                (!data.keys().hasAny(['imageUrl']) || data.imageUrl is string);
+      }
+
+      match /messages/{messageId} {
+         allow get, list: if isSignedIn() && (chatId == request.auth.uid || isAdmin());
+         allow create: if (isOwner(chatId) && isValidMessage(incoming()) && incoming().sender == 'user') || 
+                          (isAdmin() && isValidMessage(incoming()) && incoming().sender == 'admin');
+         allow update, delete: if false;
+      }
+    }
+
     // Admin Settings
     match /settings/admin {
       allow read: if isAdmin();
