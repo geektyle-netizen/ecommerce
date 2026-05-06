@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import { collection, query, getDocs, doc, setDoc, serverTimestamp, orderBy } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '../../firebase';
-import { Package, Truck, CheckCircle, Clock, Eye, X, Mail, Phone, MapPin, User, Hash } from 'lucide-react';
+import { Package, Truck, CheckCircle, Clock, Eye, X, Mail, Phone, MapPin, User, Hash, Printer } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export default function OrdersManager() {
   const [orders, setOrders] = useState<any[]>([]);
@@ -60,6 +62,62 @@ export default function OrdersManager() {
     } finally {
       setUpdating(null);
     }
+  };
+
+  const generateInvoice = (order: any) => {
+    const doc = new jsPDF();
+    const customerEmail = users[order.userId]?.email || 'N/A';
+    const customerPhone = order.address?.contactNumber || 'N/A';
+    const customerName = order.address?.name || customerEmail;
+    
+    // Header
+    doc.setFontSize(20);
+    doc.text('INVOICE', 14, 22);
+    
+    doc.setFontSize(10);
+    doc.text(`Order ID: #${order.id}`, 14, 30);
+    doc.text(`Date: ${order.createdAt?.toDate ? order.createdAt.toDate().toLocaleDateString() : 'N/A'}`, 14, 35);
+    doc.text(`Payment Method: ${order.paymentMethod}`, 14, 40);
+    doc.text(`Status: ${order.status}`, 14, 45);
+    
+    // Billing Details
+    doc.setFontSize(12);
+    doc.text('Bill To:', 14, 60);
+    doc.setFontSize(10);
+    doc.text(`${customerName}`, 14, 68);
+    doc.text(`${customerEmail}`, 14, 73);
+    doc.text(`Phone: ${customerPhone}`, 14, 78);
+    
+    if (order.address) {
+      doc.text(`${order.address.street}`, 14, 83);
+      doc.text(`${order.address.city}, ${order.address.state} - ${order.address.zip}`, 14, 88);
+    }
+
+    // Items Table
+    const tableColumn = ["Product", "Price", "Qty", "Total"];
+    const tableRows = order.items?.map((item: any) => {
+      const product = products[item.productId];
+      const title = product?.title || 'Unknown Product';
+      const price = item.priceAtPurchase || 0;
+      const qty = item.quantity || 1;
+      const total = price * qty;
+      return [title, `Rs. ${price.toLocaleString()}`, qty, `Rs. ${total.toLocaleString()}`];
+    }) || [];
+
+    autoTable(doc, {
+      startY: 100,
+      head: [tableColumn],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [79, 70, 229] }
+    });
+
+    // Total
+    const finalY = (doc as any).lastAutoTable.finalY || 100;
+    doc.setFontSize(12);
+    doc.text(`Grand Total: Rs. ${order.totalAmount?.toLocaleString()}`, 140, finalY + 10);
+    
+    doc.save(`invoice_${order.id}.pdf`);
   };
 
   const getStatusIcon = (status: string) => {
@@ -184,9 +242,18 @@ export default function OrdersManager() {
                   <h2 className="text-xl font-black text-gray-900">Order Details</h2>
                   <p className="text-xs font-mono text-gray-400">Order ID: {selectedOrder.id}</p>
                </div>
-               <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-white rounded-full transition-colors text-gray-400">
-                 <X className="w-6 h-6" />
-               </button>
+               <div className="flex items-center space-x-2">
+                 <button 
+                   onClick={() => generateInvoice(selectedOrder)}
+                   className="inline-flex items-center px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl font-bold text-sm transition-colors"
+                 >
+                   <Printer className="w-4 h-4 mr-2" />
+                   Print Invoice
+                 </button>
+                 <button onClick={() => setSelectedOrder(null)} className="p-2 hover:bg-white rounded-full transition-colors text-gray-400">
+                   <X className="w-6 h-6" />
+                 </button>
+               </div>
              </div>
 
              <div className="flex-1 overflow-y-auto p-6 md:p-8 space-y-8">

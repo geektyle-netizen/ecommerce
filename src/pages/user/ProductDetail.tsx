@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, collection, query, orderBy, getDocs, setDoc, serverTimestamp, runTransaction } from 'firebase/firestore';
+import { doc, getDoc, collection, query, orderBy, getDocs, setDoc, serverTimestamp, runTransaction, where } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, auth } from '../../firebase';
 import { AppUser } from '../../App';
 import { useCart } from '../../context/CartContext';
@@ -24,6 +24,29 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
   const [submittingReview, setSubmittingReview] = useState(false);
+  const [hasPurchased, setHasPurchased] = useState(false);
+
+  useEffect(() => {
+    const fetchPurchaseStatus = async () => {
+      if (!user || user.role === 'admin') return;
+      if (!id) return;
+      try {
+        const q = query(
+          collection(db, 'orders'),
+          where('userId', '==', user.uid)
+        );
+        const snaps = await getDocs(q);
+        const purchased = snaps.docs.some(doc => {
+          const items = doc.data().items || [];
+          return items.some((item: any) => item.productId === id);
+        });
+        setHasPurchased(purchased);
+      } catch (error) {
+        console.error("Error fetching purchases", error);
+      }
+    };
+    fetchPurchaseStatus();
+  }, [user, id]);
 
   useEffect(() => {
     const fetchProductAndData = async () => {
@@ -251,7 +274,7 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
       <div className="bg-white rounded-3xl p-8 border border-gray-100 shadow-sm">
         <h2 className="text-2xl font-bold tracking-tight mb-8">Customer Reviews</h2>
         
-        {user ? (
+        {user ? hasPurchased ? (
           <div className="mb-10 bg-gray-50 rounded-2xl p-6 border border-gray-100">
             <h3 className="text-lg font-semibold mb-4">Write a review</h3>
             <form onSubmit={submitReview} className="space-y-4">
@@ -289,6 +312,10 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
                 {submittingReview ? 'Submitting...' : 'Submit Review'}
               </button>
             </form>
+          </div>
+        ) : (
+          <div className="mb-10 bg-gray-50 rounded-2xl p-6 border border-gray-100 text-center">
+            <p className="text-gray-600">You must purchase this product to leave a review.</p>
           </div>
         ) : (
           <div className="mb-10 bg-gray-50 rounded-2xl p-6 border border-gray-100 text-center">

@@ -16,12 +16,12 @@ export default function ProductsManager() {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    originalPrice: 0,
-    price: 0,
+    originalPrice: '' as string | number,
+    price: '' as string | number,
     category: '',
     subCategory: '',
     images: [] as string[],
-    inventory: 0,
+    inventory: '' as string | number,
   });
 
   const fetchData = async () => {
@@ -47,66 +47,90 @@ export default function ProductsManager() {
     fetchData();
   }, []);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-    if (formData.images.length >= 5) {
-      toast.error('Maximum 5 images allowed');
+    if (formData.images.length + files.length > 5) {
+      toast.error(`Maximum 5 images allowed. You can only add ${5 - formData.images.length} more.`);
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
-        let width = img.width;
-        let height = img.height;
+    const processImage = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 800;
+            const MAX_HEIGHT = 800;
+            let width = img.width;
+            let height = img.height;
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            
+            if (dataUrl.length > 500000) {
+               reject(new Error('Image is too large after compression.'));
+               return;
+            }
+            resolve(dataUrl);
+          };
+          img.onerror = () => reject(new Error('Failed to load image.'));
+          if (event.target?.result) {
+            img.src = event.target.result as string;
           }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        
-        // Base64 size limit check (Firestore document limit is 1MB)
-        if (dataUrl.length > 500000) {
-           toast.error('Image is too large. Please select a smaller image.');
-           return;
-        }
-
-        setFormData(prev => ({
-          ...prev,
-          images: [...prev.images, dataUrl]
-        }));
-      };
-      if (event.target?.result) {
-        img.src = event.target.result as string;
-      }
+        };
+        reader.onerror = () => reject(new Error('Failed to read file.'));
+        reader.readAsDataURL(file);
+      });
     };
-    reader.readAsDataURL(file);
+
+    try {
+      const processedImages = await Promise.all(
+        files.map(file => processImage(file).catch(err => {
+          toast.error(err.message);
+          return null;
+        }))
+      );
+
+      const validImages = processedImages.filter(Boolean) as string[];
+      
+      setFormData(prev => ({
+        ...prev,
+        images: [...prev.images, ...validImages]
+      }));
+    } catch (error) {
+      console.error(error);
+    }
+    
+    // Clear input so same files can be uploaded again if needed
+    if (e.target) {
+      e.target.value = '';
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!auth.currentUser) return;
     
-    if (formData.price > formData.originalPrice && formData.originalPrice > 0) {
+    if (Number(formData.price) > Number(formData.originalPrice) && Number(formData.originalPrice) > 0) {
        toast.error("Offer price must be less than original price");
        return;
     }
@@ -169,12 +193,12 @@ export default function ProductsManager() {
     setFormData({
       title: '',
       description: '',
-      originalPrice: 0,
-      price: 0,
+      originalPrice: '',
+      price: '',
       category: '',
       subCategory: '',
       images: [],
-      inventory: 0,
+      inventory: '',
     });
     setEditingId(null);
   };
@@ -183,12 +207,12 @@ export default function ProductsManager() {
     setFormData({
       title: product.title,
       description: product.description,
-      originalPrice: product.originalPrice || 0,
-      price: product.price,
+      originalPrice: product.originalPrice || '',
+      price: product.price || '',
       category: product.category,
       subCategory: product.subCategory || '',
       images: product.images || [],
-      inventory: product.inventory,
+      inventory: product.inventory !== undefined ? product.inventory : '',
     });
     setEditingId(product.id);
     setIsModalOpen(true);
@@ -316,7 +340,7 @@ export default function ProductsManager() {
                     min="0"
                     step="0.01"
                     value={formData.originalPrice}
-                    onChange={(e) => setFormData({...formData, originalPrice: e.target.value ? Number(e.target.value) : 0})}
+                    onChange={(e) => setFormData({...formData, originalPrice: e.target.value})}
                     className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-gray-900 focus:border-gray-900 outline-none"
                   />
                 </div>
@@ -329,7 +353,7 @@ export default function ProductsManager() {
                     min="0"
                     step="0.01"
                     value={formData.price}
-                    onChange={(e) => setFormData({...formData, price: e.target.value ? Number(e.target.value) : 0})}
+                    onChange={(e) => setFormData({...formData, price: e.target.value})}
                     className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-gray-900 focus:border-gray-900 outline-none"
                   />
                 </div>
@@ -341,7 +365,7 @@ export default function ProductsManager() {
                     type="number"
                     min="0"
                     value={formData.inventory}
-                    onChange={(e) => setFormData({...formData, inventory: e.target.value ? Number(e.target.value) : 0})}
+                    onChange={(e) => setFormData({...formData, inventory: e.target.value})}
                     className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-gray-900 focus:border-gray-900 outline-none"
                   />
                 </div>
@@ -384,6 +408,7 @@ export default function ProductsManager() {
                        <input 
                           type="file" 
                           accept="image/*" 
+                          multiple
                           className="hidden" 
                           onChange={handleImageUpload}
                        />
