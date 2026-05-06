@@ -131,6 +131,11 @@ service cloud.firestore {
       }
     }
 
+    // Reviews (Collection Group for Admin)
+    match /{path=**}/reviews/{reviewId} {
+      allow list: if isAdmin();
+    }
+
     // Orders
     function isValidOrder(data) {
        return data.keys().hasAll(['userId', 'items', 'totalAmount', 'status', 'createdAt', 'updatedAt']) &&

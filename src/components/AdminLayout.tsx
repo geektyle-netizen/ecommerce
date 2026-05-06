@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { LayoutDashboard, Package, ShoppingBag, Users, FileText, Settings as SettingsIcon, ArrowLeft, LogOut, Layers, Tags, MessageCircle } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingBag, Users, FileText, Settings as SettingsIcon, ArrowLeft, LogOut, Layers, Tags, MessageCircle, Star } from 'lucide-react';
 import { AppUser } from '../App';
 import { auth, db } from '../firebase';
 import { signOut } from 'firebase/auth';
@@ -35,7 +35,8 @@ export default function AdminLayout({ user }: { user: AppUser | null }) {
     { name: 'Users', path: '/admin/users', icon: Users },
     { name: 'Reports', path: '/admin/reports', icon: FileText },
     { name: 'Settings', path: '/admin/settings', icon: SettingsIcon },
-    { name: 'Messages', path: '/admin/messages', icon: MessageCircle, badge: unreadMessagesCount }
+    { name: 'Messages', path: '/admin/messages', icon: MessageCircle, badge: unreadMessagesCount },
+    { name: 'Reviews', path: '/admin/reviews', icon: Star }
   ];
 
   return (

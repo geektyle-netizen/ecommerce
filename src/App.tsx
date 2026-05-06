@@ -28,6 +28,7 @@ import UsersManager from './pages/admin/UsersManager';
 import Reports from './pages/admin/Reports';
 import Settings from './pages/admin/Settings';
 import Messages from './pages/admin/Messages';
+import ReviewsManager from './pages/admin/ReviewsManager';
 
 import Login from './pages/Login';
 
@@ -119,6 +120,7 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="settings" element={<Settings />} />
         <Route path="messages" element={<Messages />} />
+        <Route path="reviews" element={<ReviewsManager />} />
       </Route>
     </Routes>
   );
