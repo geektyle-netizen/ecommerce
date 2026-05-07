@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 export default function OrderTracking({ user }: { user: AppUser }) {
   const [orders, setOrders] = useState<any[]>([]);
+  const [products, setProducts] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
 
   // Captcha State
@@ -32,7 +33,15 @@ export default function OrderTracking({ user }: { user: AppUser }) {
           collection(db, 'orders'),
           where('userId', '==', user.uid)
         );
-        const querySnapshot = await getDocs(q);
+        const [querySnapshot, productsSnap] = await Promise.all([
+          getDocs(q),
+          getDocs(collection(db, 'products'))
+        ]);
+        
+        const productsMap: Record<string, any> = {};
+        productsSnap.docs.forEach(d => { productsMap[d.id] = d.data(); });
+        setProducts(productsMap);
+
         const fetchedOrders = querySnapshot.docs.map(d => ({
           id: d.id,
           ...(d.data() as object)
@@ -165,24 +174,33 @@ export default function OrderTracking({ user }: { user: AppUser }) {
 
               <div className="p-6">
                 <div className="space-y-4">
-                  {order.items?.map((item: any, idx: number) => (
+                  {order.items?.map((item: any, idx: number) => {
+                    const product = products[item.productId];
+                    return (
                     <div key={idx} className="flex items-center justify-between py-2 border-t border-gray-50 pt-4">
                       <div className="flex items-center">
-                        <div className="w-12 h-12 bg-gray-100 rounded-lg mr-4 flex items-center justify-center text-gray-400">
-                          <Package className="w-6 h-6" />
-                        </div>
+                        <Link to={`/product/${item.productId}`} className="flex-shrink-0">
+                          {product?.images?.[0] ? (
+                            <img src={product.images[0]} alt={product.title} className="w-16 h-16 rounded-xl mr-4 object-cover border border-gray-100 shadow-sm" />
+                          ) : (
+                            <div className="w-16 h-16 bg-gray-50 rounded-xl mr-4 flex items-center justify-center text-gray-400 border border-gray-100 shadow-sm">
+                              <Package className="w-6 h-6" />
+                            </div>
+                          )}
+                        </Link>
                         <div>
-                          <Link to={`/product/${item.productId}`} className="font-medium text-gray-900 hover:text-blue-600 transition-colors">
-                            Product ID: {item.productId ? item.productId.slice(0, 8) : 'Unknown'}...
+                          <Link to={`/product/${item.productId}`} className="font-bold text-gray-900 hover:text-indigo-600 transition-colors line-clamp-1">
+                            {product?.title || `Product ID: ${item.productId ? item.productId.slice(0, 8) : 'Unknown'}...`}
                           </Link>
-                          <p className="text-sm text-gray-500">Qty: {item.quantity}</p>
+                          <p className="text-sm font-medium text-gray-500 mt-1">Qty: {item.quantity}</p>
                         </div>
                       </div>
-                      <div className="font-medium text-gray-900">
+                      <div className="font-bold text-gray-900 text-right">
                         ₹{(item.priceAtPurchase * item.quantity).toLocaleString()}
+                        <p className="text-[10px] font-medium text-gray-400 uppercase tracking-wider mt-0.5">Total</p>
                       </div>
                     </div>
-                  ))}
+                  )})}
                 </div>
               </div>
             </div>

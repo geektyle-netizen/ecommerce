@@ -23,12 +23,13 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
   // Review form
   const [reviewText, setReviewText] = useState('');
   const [reviewRating, setReviewRating] = useState(5);
+  const [reviewImages, setReviewImages] = useState<string[]>([]);
   const [submittingReview, setSubmittingReview] = useState(false);
   const [hasPurchased, setHasPurchased] = useState(false);
 
   useEffect(() => {
     const fetchPurchaseStatus = async () => {
-      if (!user || user.role === 'admin') return;
+      if (!user) return;
       if (!id) return;
       try {
         const q = query(
@@ -38,7 +39,7 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
         const snaps = await getDocs(q);
         const purchased = snaps.docs.some(doc => {
           const items = doc.data().items || [];
-          return items.some((item: any) => item.productId === id);
+          return items.some((item: any) => item.productId === id) && doc.data().status === 'delivered';
         });
         setHasPurchased(purchased);
       } catch (error) {
@@ -135,6 +136,7 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
            userName: user.email?.split('@')[0] || 'User',
            rating: newRating,
            text: reviewText,
+           images: reviewImages,
            createdAt: serverTimestamp()
          });
 
@@ -152,6 +154,7 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
         userName: user.email?.split('@')[0] || 'User',
         rating: reviewRating,
         text: reviewText,
+        images: reviewImages,
         createdAt: new Date()
       }, ...reviews]);
       
@@ -163,6 +166,7 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
 
       setReviewText('');
       setReviewRating(5);
+      setReviewImages([]);
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, `products/${id}/reviews`);
     } finally {
@@ -173,6 +177,88 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
 
   const getCategoryName = (cid: string) => categories.find(c => c.id === cid)?.name || cid;
   const getSubCategoryName = (sid: string) => subCategories.find(s => s.id === sid)?.name || sid;
+
+  const handleReviewImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
+
+    if (reviewImages.length + files.length > 5) {
+      alert(`Maximum 5 images allowed. You can only add ${5 - reviewImages.length} more.`);
+      return;
+    }
+
+    const processImage = (file: File): Promise<string> => {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const MAX_WIDTH = 800;
+            const MAX_HEIGHT = 800;
+            let width = img.width;
+            let height = img.height;
+
+            if (width > height) {
+              if (width > MAX_WIDTH) {
+                height *= MAX_WIDTH / width;
+                width = MAX_WIDTH;
+              }
+            } else {
+              if (height > MAX_HEIGHT) {
+                width *= MAX_HEIGHT / height;
+                height = MAX_HEIGHT;
+              }
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0, width, height);
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+            
+            if (dataUrl.length > 500000) {
+               reject(new Error('Image is too large after compression.'));
+               return;
+            }
+            resolve(dataUrl);
+          };
+          img.onerror = () => reject(new Error('Failed to load image.'));
+          if (event.target?.result) {
+            img.src = event.target.result as string;
+          }
+        };
+        reader.onerror = () => reject(new Error('Failed to read file.'));
+        reader.readAsDataURL(file);
+      });
+    };
+
+    try {
+      setSubmittingReview(true); // Reusing as loading state for images
+      const processedImages = await Promise.all(
+        files.map(file => processImage(file).catch(err => {
+          alert(err.message);
+          return null;
+        }))
+      );
+
+      const validImages = processedImages.filter(Boolean) as string[];
+      
+      setReviewImages(prev => [...prev, ...validImages]);
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setSubmittingReview(false);
+    }
+    
+    if (e.target) {
+      e.target.value = '';
+    }
+  };
+
+  const removeReviewImage = (index: number) => {
+    setReviewImages(prev => prev.filter((_, i) => i !== index));
+  };
 
   if (loading) return <div className="py-20 text-center">Loading product...</div>;
   if (!product) return <div className="py-20 text-center">Product not found</div>;
@@ -304,6 +390,46 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
                   placeholder="What did you think about this product?"
                 />
               </div>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <label className="cursor-pointer bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 font-medium py-2 px-4 rounded-xl transition-colors inline-flex items-center text-sm">
+                     <ImageIcon className="w-4 h-4 mr-2" />
+                     Add Photos
+                     <input 
+                        type="file" 
+                        accept="image/*" 
+                        multiple
+                        className="hidden" 
+                        onChange={handleReviewImageUpload}
+                        disabled={submittingReview}
+                     />
+                  </label>
+                  <span className="text-xs text-gray-500">{reviewImages.length}/5 images</span>
+                </div>
+
+                {reviewImages.length > 0 && (
+                  <div className="flex gap-4 overflow-x-auto py-2">
+                    {reviewImages.map((img, index) => (
+                      <div key={index} className="relative flex-shrink-0">
+                        <img 
+                          src={img} 
+                          alt={`Review upload ${index + 1}`} 
+                          className="w-20 h-20 object-cover rounded-xl border border-gray-200"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removeReviewImage(index)}
+                          className="absolute -top-2 -right-2 bg-white rounded-full p-1 shadow-md border border-gray-100 text-gray-500 hover:text-red-500 transition-colors"
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <button 
                 type="submit" 
                 disabled={submittingReview || !reviewText.trim()}
@@ -343,7 +469,19 @@ export default function ProductDetail({ user }: { user: AppUser | null }) {
                     <Star key={star} className={`w-4 h-4 ${review.rating >= star ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} />
                   ))}
                 </div>
-                <p className="text-gray-700 leading-relaxed text-sm">{review.text}</p>
+                <p className="text-gray-700 leading-relaxed text-sm mb-3">{review.text}</p>
+                {review.images && review.images.length > 0 && (
+                  <div className="flex gap-3 overflow-x-auto">
+                    {review.images.map((img: string, idx: number) => (
+                      <img 
+                        key={idx} 
+                        src={img} 
+                        alt={`Review attached photo ${idx + 1}`} 
+                        className="w-20 h-20 object-cover rounded-xl border border-gray-100" 
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))
           )}
